@@ -16,26 +16,6 @@ function getId(ws) {
   return maxI++;
 }
 
-const map2 = new Map(); // id -> ws
-const ids = new Set();
-
-function otherIds(ownId) {
-  const res = [];
-  for (const id of ids.keys()) {
-    if (id !== ownId) {
-      res.push(id);
-    }
-  }
-  return res;
-}
-
-function sendToOthers(ownId, msg_) {
-  const msg = pack(msg_);
-  otherIds(ownId).map(id => map2.get(id)).forEach(ws => ws.send(msg, true));
-}
-
-let lastSendWasFrom;
-
 const app = _App({
   key_file_name: 'misc/key.pem',
   cert_file_name: 'misc/cert.pem',
@@ -52,12 +32,10 @@ const app = _App({
 
     if (!ws.id) {
       ws.id = getId(ws);
-      map2.set(ws.id, ws);
-      ids.add(ws.id);
       console.log(`new client: ${ws.id}`);
     }
 
-    ws.send(pack({ op:'own-id', id:ws.id}), true);
+    ws.subscribe('broadcast');
   },
   message: (ws, message, isBinary) => {
     //const data = isBinary ? unpack(Buffer.from(message)) : ab2str(message);
@@ -68,19 +46,8 @@ const app = _App({
 
     const data = unpack(Buffer.from(message))
 
-    switch (data.op) {
-      case 'say':
-        console.log(`${ws.id}: ${data.text}`);
-        if (lastSendWasFrom === ws.id) {
-          ws.send(pack({op:'error', error:`you're spamming! ignored this message: ${data.text}`}), true);
-        } else {
-          sendToOthers(ws.id, {op:'say', text:data.text, from:ws.id});
-          lastSendWasFrom = ws.id;
-        }
-        break;
-      default:
-        console.log(`unsupported opcode: ${data.op}`);
-    }
+    const data2 = pack({...data, from:ws.id});
+    ws.publish('broadcast', data2, true);
   },
   drain: (ws) => {
     console.log('WebSocket backpressure: ' + ws.getBufferedAmount());
@@ -91,8 +58,6 @@ const app = _App({
     if (!ws.id) {
       console.log('oops');
     } else {
-      map2.delete(ws.id);
-      ids.delete(ws.id);
       console.log(`closed ${ws.id} ok`);
     }
   }

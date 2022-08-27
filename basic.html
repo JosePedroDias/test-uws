@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8">
-        <title>authoritative client</title>
+        <title>broadcast or autho client</title>
         <script src="https://unpkg.com/msgpackr@1.6.2/dist/index.min.js"></script>
 
         <style>
@@ -28,7 +28,7 @@
             const received = document.querySelector('#received');
             toSend.focus();
 
-            let me;
+            let me = 'me';
             
             function write(msg) {
                 const el = document.createElement('p');

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>snake autho client</title>
+        <script src="https://unpkg.com/msgpackr@1.6.2/dist/index.min.js"></script>
+
+        <style>
+            code {
+                background-color: #DDD;
+                border: 1px solid #777;
+                display: inline-block;
+            }
+
+            pre {
+                margin: 0;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <code><pre id="board"> </pre></code>
+
+        <script>
+            class Board {
+                constructor(w, h, value=' ') {
+                    this.array = new Array(w*h);
+                    this.array.fill(value);
+                    this.w = w;
+                    this.h = h;
+                }
+
+                toString() {
+                    const lines = [];
+                    for (let y = 0; y < this.h; ++y) {
+                        lines.push( this.array.slice(y*this.w, (y+1)*this.w).join('') );
+                    }
+                    return lines.join('\n');
+                }
+
+                patch(diffs) {
+                    for (let [i, v] of diffs) {
+                        this.array[i] = v;
+                    }
+                }
+            }
+
+            let board;
+
+            document.body.addEventListener('keydown', (ev) => {
+                const key = ev.key;
+                if (key.substring(0, 5) === 'Arrow') {
+                    const k = key.substring(5).toLowerCase();
+                    send({op:'key', key:k});
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                }
+            })
+
+            const boardEl = document.getElementById('board');
+            
+            const ws = new WebSocket('ws://127.0.0.1:9001');
+            ws.binaryType = 'arraybuffer'; // to get an arraybuffer instead of a blob
+
+            function send(o) {
+                ws.send(msgpackr.pack(o));
+            }
+
+            ws.addEventListener('open', () => {
+                console.log('open');
+            });
+
+            ws.addEventListener('close', () => {
+                console.log('close');
+            });
+
+            ws.addEventListener('error', (ev) => {
+                console.error(ev);
+            });
+
+            ws.addEventListener('message', (ev) => {
+                try {
+                    const data = msgpackr.unpack( new Uint8Array(ev.data) );
+                    switch (data.op) {
+                        case 'own-id':
+                            break;
+                        case 'board-init':
+                            board = new Board(data.w, data.h, ' ');
+                            break;
+                        case 'board-diff':
+                            board.patch(data.diff);
+                            boardEl.firstChild.nodeValue = board.toString();
+                            break;
+                        default:
+                            console.log(`unsupported opcode: ${data.op}!`);
+                    }
+                } catch (ex) {
+                    console.error('expected msgpack object', ex);
+                }
+            });
+        </script>
+    </body>
+</html>
