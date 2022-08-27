@@ -14,8 +14,8 @@ https://github.com/kriszyp/msgpackr
 everything received is sent to every other client (with from:id)
 
 ```
-node broadcast &
 http-server . -c-1 -p 8090 --cors &
+node broadcast
 ```
 
 visit http://127.0.0.1:8090/basic.html -> ws://127.0.0.1:9001
@@ -25,8 +25,8 @@ visit http://127.0.0.1:8090/basic.html -> ws://127.0.0.1:9001
 simplest auth server ever: ignores consecutive messages from the same sender reaching others
 
 ```
-node autho &
 http-server . -c-1 -p 8090 --cors &
+node autho
 ```
 
 visit http://127.0.0.1:8090/basic.html -> ws://127.0.0.1:9001
@@ -41,8 +41,3 @@ node snake
 ```
 
 visit http://127.0.0.1:8090/snake.html -> ws://127.0.0.1:9001
-
-
-TODO:
-- assign different snake instances to different players
-- add food every n ticks

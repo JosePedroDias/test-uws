@@ -5,8 +5,8 @@ const PORT = 9001;
 
 ///////////
 
-const W = 60;
-const H = 30;
+const W = 80;
+const H = 36;
 
 const CHAR_EMPTY = ' ';
 const CHAR_SNAKE = 'O';
@@ -14,6 +14,12 @@ const CHAR_FOOD = '*';
 const CHAR_OBSTACLE = '#';
 
 const TICK_RATE_MS = 1000 / 10; // 10 times/second
+
+const ADD_FOOD_EVERY_N_TICKS = 30;
+const ADD_OBSTACLE_EVERY_N_TICKS = 120;
+
+let ticksLeftForFood = ADD_FOOD_EVERY_N_TICKS;
+let ticksLeftForObstacle = ADD_OBSTACLE_EVERY_N_TICKS;
 
 const dirLookup = {
     left:  [-1,  0],
@@ -44,6 +50,17 @@ class Board {
 
     setCell(x, y, v) {
         this.array[ this.getIndex(x, y) ] = v;
+    }
+
+    getRandomCellWithValue(value=CHAR_EMPTY) {
+        let pos;
+        do {
+            pos = [
+                rndInt(this.w),
+                rndInt(this.h)
+            ];
+        } while (this.getCell(pos[0], pos[1]) !== value);
+        return pos;
     }
 
     toString() {
@@ -88,15 +105,8 @@ class Snake {
         this.glowEvery = 10;
         this.toGrow = this.glowEvery;
 
-        let pos;
-        do {
-            pos = [
-                rndInt(b.w),
-                rndInt(b.h)
-            ];
-        } while (b.getCell(pos[0], pos[1]) !== CHAR_EMPTY);
-        
         this.ps = [];
+        const pos = b.getRandomCellWithValue(CHAR_EMPTY);
         this.ps.push(pos);
 
         this.onDied = onDied;
@@ -116,14 +126,24 @@ class Snake {
         const tip = Array.from(this.ps[0]);
         const dP = dirLookup[this.dir];
 
-        if (!dP) {
-            return;
-        }
+        if (!dP) return;
 
         tip[0] += dP[0];
         tip[1] += dP[1];
 
-        if (!this.isValidPosition(tip) || this.b.getCell(tip[0], tip[1]) !== CHAR_EMPTY) {
+        let grows = false;
+
+        let collided = !this.isValidPosition(tip);
+        if (!collided) {
+            const v = this.b.getCell(tip[0], tip[1]) ;
+            if (v === CHAR_FOOD) {
+                grows = true;
+            } else if (v !== CHAR_EMPTY) {
+                collided = true;
+            }
+        }
+
+        if (collided) {
             this.died = true;
             this.onDied && this.onDied()
             return;
@@ -134,7 +154,6 @@ class Snake {
 
         --this.toGrow;
 
-        let grows = false;
         if (this.toGrow === 0) {
             grows = true;
             this.toGrow = this.glowEvery;
@@ -155,7 +174,6 @@ class Snake {
 let board0 = new Board(W, H, CHAR_EMPTY); // REFERENCE FOR NEW CLIENTS
 let boardPrev = board0.clone();
 let board;
-let snake;
 
 let snakes = new Map(); // id -> snake
 
@@ -185,6 +203,20 @@ function reset() {
 }
 
 function onTick() {
+    --ticksLeftForFood;
+    if (ticksLeftForFood === 0) {
+        const [x,y] = board.getRandomCellWithValue(CHAR_EMPTY);
+        board.setCell(x, y, CHAR_FOOD);
+        ticksLeftForFood = ADD_FOOD_EVERY_N_TICKS;
+    }
+
+    --ticksLeftForObstacle;
+    if (ticksLeftForObstacle === 0) {
+        const [x,y] = board.getRandomCellWithValue(CHAR_EMPTY);
+        board.setCell(x, y, CHAR_OBSTACLE);
+        ticksLeftForObstacle = ADD_OBSTACLE_EVERY_N_TICKS;
+    }
+
     for (const snake of snakes.values()) snake.move();
 
     const diff = board.diff(boardPrev);
