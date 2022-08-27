@@ -105,21 +105,7 @@ class Snake {
 
         this.onDied = onDied;
 
-        this.draw();
-    }
-
-    clear() {
-        const b = this.b;
-        for (let pos of this.ps) {
-            b.setCell(pos[0], pos[1], CHAR_EMPTY);
-        }
-    }
-
-    draw() {
-        const b = this.b;
-        for (let pos of this.ps) {
-            b.setCell(pos[0], pos[1], CHAR_SNAKE);
-        }
+        b.setCell(pos[0], pos[1], CHAR_SNAKE);
     }
 
     isValidPosition([x, y]) {
@@ -128,6 +114,8 @@ class Snake {
 
     move() {
         if (this.died) return;
+
+        const b = this.b
 
         const tip = Array.from(this.ps[0]);
         const dP = dirLookup[this.dir];
@@ -139,7 +127,6 @@ class Snake {
         tip[0] += dP[0];
         tip[1] += dP[1];
 
-        // TODO NOT WORKING WELL BECAUSE BOARD IS EMPTY AND GETCELL WILL NEVER FAIL
         if (!this.isValidPosition(tip) || this.b.getCell(tip[0], tip[1]) !== CHAR_EMPTY) {
             this.died = true;
             this.onDied && this.onDied()
@@ -147,6 +134,7 @@ class Snake {
         }
 
         this.ps.unshift(tip);
+        b.setCell(tip[0], tip[1], CHAR_SNAKE);
 
         --this.toGrow;
 
@@ -157,7 +145,8 @@ class Snake {
         }
 
         if (!grows) {
-            this.ps.pop();
+            const tail = this.ps.pop();
+            b.setCell(tail[0], tail[1], CHAR_EMPTY);
         }
     }
 
@@ -174,9 +163,7 @@ const snake = new Snake(board, () => {
 function onTick() {
     if (!_ws) return;
 
-    snake.clear();
     snake.move();
-    snake.draw();
 
     const diff = board.diff(boardPrev);
 

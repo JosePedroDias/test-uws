@@ -44,5 +44,5 @@ visit http://127.0.0.1:8090/snake.html -> ws://127.0.0.1:9001
 
 
 TODO:
-- add multiple clients
-- add food
+- assign different snake instances to different players
+- add food every n ticks
