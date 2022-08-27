@@ -15,8 +15,6 @@ const CHAR_SNAKE = 'O';
 const CHAR_FOOD = '*';
 const CHAR_OBSTACLE = '#';
 
-//const TOPIC_BROADCAST = 'broadcast';
-
 const dirLookup = {
     left:  [-1,  0],
     right: [ 1,  0],
@@ -82,10 +80,6 @@ class Board {
         }
     }
 }
-
-let board0 = new Board(W, H, CHAR_EMPTY); // REFERENCE FOR NEW CLIENTS
-let boardPrev = board0.clone();
-let board = boardPrev.clone();
 
 class Snake {
     constructor(b, onDied) {
@@ -158,11 +152,19 @@ class Snake {
     }
 }
 
-const snake = new Snake(board, () => {
-    //const ws = getAnyWs();
-    //ws?.publish(TOPIC_BROADCAST, pack({ op:'game-over' }), true);
-    broadcast({ op:'game-over' });
-});
+let board0 = new Board(W, H, CHAR_EMPTY); // REFERENCE FOR NEW CLIENTS
+let boardPrev = board0.clone();
+let board;
+let snake;
+reset();
+
+function reset() {
+    board = board0.clone();
+    snake = new Snake(board, () => {
+        broadcast({ op:'game-over' });
+        setTimeout(reset, 1000);
+    });
+}
 
 function onTick() {
     snake.move();
@@ -171,15 +173,12 @@ function onTick() {
 
     if (diff.length > 0) {
         broadcast({ op:'board-diff', diff:board.diff(boardPrev) });
-        //ws.publish(TOPIC_BROADCAST, pack({ op:'board-diff', diff:board.diff(boardPrev) }), true);
 
         boardPrev = board.clone();
     }
 }
 
 setInterval(onTick, 1000 / 10);
-
-
 
 ///////////
 
@@ -192,11 +191,6 @@ function getId(ws) {
 }
 
 const idToWsInstance = new Map(); // id -> ws
-
-function getAnyWs() {
-    const wss = Array.from(idToWsInstance.values());
-    return wss && wss[0];
-}
 
 function broadcast(msg) {
     const msgO = pack(msg);
@@ -231,8 +225,6 @@ const app = _App({
     ws.send(pack({ op:'board-init', w:W, h:H }), true);
 
     ws.send(pack({ op:'board-diff', diff:board.diff(board0) }), true);
-
-    //ws.subscribe(TOPIC_BROADCAST);
   },
   message: (ws, message, isBinary) => {
     if (!isBinary) {
