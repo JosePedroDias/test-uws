@@ -44,7 +44,8 @@ const app = _App({
 }).ws('/*', {
   //compression: 0,
   compression: uWS.SHARED_COMPRESSOR,
-  maxPayloadLength: 16 * 1024 * 1024,
+  //maxPayloadLength: 16 * 1024 * 1024, // bytes?
+  maxPayloadLength: 4 * 1024, // bytes?
   idleTimeout: 60, // secs?
 
   open: (ws) => {
@@ -57,20 +58,29 @@ const app = _App({
       console.log(`new client: ${ws.id}`);
     }
 
-    //ws.send(`you're ${ws.id}`));
-    ws.send(pack(`you're ${ws.id}`), true);
+    ws.send(pack({ op:'own-id', id:ws.id}), true);
   },
-  message: (ws, message_, isBinary) => {
-    //console.log(message_);
-    const message = isBinary ? unpack(Buffer.from(message_)) : ab2str(message_);
+  message: (ws, message, isBinary) => {
+    //const data = isBinary ? unpack(Buffer.from(message)) : ab2str(message);
+    if (!isBinary) {
+      console.warn(`ignored non-binary incoming message: ${ab2str(message)}`);
+      return;
+    }
 
-    console.log(`${ws.id}: ${JSON.stringify(message)}`);
+    const data = unpack(Buffer.from(message))
 
-    if (lastSendWasFrom === ws.id) {
-      ws.send(pack(`you're spamming! ignored this message ${message}`), true);
-    } else {
-      sendToOthers(ws.id, `${ws.id}: ${message}`);
-      lastSendWasFrom = ws.id;
+    switch (data.op) {
+      case 'say':
+        console.log(`${ws.id}: ${data.text}`);
+        if (lastSendWasFrom === ws.id) {
+          ws.send(pack({op:'error', error:`you're spamming! ignored this message: ${data.text}`}), true);
+        } else {
+          sendToOthers(ws.id, {op:'say', text:data.text, from:ws.id});
+          lastSendWasFrom = ws.id;
+        }
+        break;
+      default:
+        console.log(`unsupported opcode: ${data.op}`);
     }
   },
   drain: (ws) => {

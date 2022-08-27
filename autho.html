@@ -26,6 +26,9 @@
         <script>
             const toSend = document.querySelector('#to-send');
             const received = document.querySelector('#received');
+            toSend.focus();
+
+            let me;
             
             function write(msg) {
                 const el = document.createElement('p');
@@ -36,38 +39,48 @@
             toSend.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter') {
                     const msg = toSend.value;
-                    const ob = msgpackr.pack(msg);
-                    ws.send(ob);
-                    write(`> ${msg}`);
+                    ws.send(msgpackr.pack({ op:'say', text:msg }));
+                    write(`> ${me}: ${msg}`);
                     toSend.value = '';
                 }
             });
             
             const ws = new WebSocket('ws://127.0.0.1:9001');
-            ws.binaryType = 'arraybuffer';
+            ws.binaryType = 'arraybuffer'; // to get an arraybuffer instead of a blob
 
             ws.addEventListener('open', (ev) => {
-                console.log('open', ev);
+                //console.log('open', ev);
+                write('OPENED!');
             });
 
             ws.addEventListener('close', (ev) => {
-                console.log('close', ev);
+                //console.log('close', ev);
+                write('CLOSED!');
             });
 
             ws.addEventListener('error', (ev) => {
-                console.log('error', ev);
+                console.error(ev);
             });
 
             ws.addEventListener('message', (ev) => {
-                const rawData = ev.data;
-                if (typeof rawData === 'string') {
-                    write(`< ${rawData}`);
-                }
-                else {
-                    let data = msgpackr.unpack( new Uint8Array(rawData) );
-                    console.log(data);
-                    data = JSON.stringify(data);
-                    write(`< ${data}`);
+                try {
+                    const data = msgpackr.unpack( new Uint8Array(ev.data) );
+                    switch (data.op) {
+                        case 'own-id':
+                            console.log(`own id is ${data.id}`);
+                            me = data.id;
+                            document.title = `autho: ${data.id}`;
+                            break;
+                        case 'say':
+                            write(`< ${data.from}: ${data.text}`);
+                            break;
+                        case 'error':
+                            console.warn(data.error);
+                        default:
+                            console.log(`unsupported opcode: ${data.op}!`);
+                    }
+                } catch (ex) {
+                    console.error('expected msgpack object', ex);
                 }
             });
         </script>
