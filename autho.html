@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>authoritative client</title>
+        <script src="https://unpkg.com/msgpackr@1.6.2/dist/index.min.js"></script>
+
+        <style>
+            #to-send {
+                font-family: monospace;
+            }
+
+            #received {
+                font-family: monospace;
+            }
+
+            #received p {
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <input id="to-send" type="text"><br>
+        <div id="received"></div>
+
+        <script>
+            const toSend = document.querySelector('#to-send');
+            const received = document.querySelector('#received');
+            
+            function write(msg) {
+                const el = document.createElement('p');
+                el.appendChild( document.createTextNode(msg) );
+                received.appendChild(el);
+            }
+
+            toSend.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') {
+                    const msg = toSend.value;
+                    const ob = msgpackr.pack(msg);
+                    ws.send(ob);
+                    write(`> ${msg}`);
+                    toSend.value = '';
+                }
+            });
+            
+            const ws = new WebSocket('ws://127.0.0.1:9001');
+            ws.binaryType = 'arraybuffer';
+
+            ws.addEventListener('open', (ev) => {
+                console.log('open', ev);
+            });
+
+            ws.addEventListener('close', (ev) => {
+                console.log('close', ev);
+            });
+
+            ws.addEventListener('error', (ev) => {
+                console.log('error', ev);
+            });
+
+            ws.addEventListener('message', (ev) => {
+                const rawData = ev.data;
+                if (typeof rawData === 'string') {
+                    write(`< ${rawData}`);
+                }
+                else {
+                    let data = msgpackr.unpack( new Uint8Array(rawData) );
+                    console.log(data);
+                    data = JSON.stringify(data);
+                    write(`< ${data}`);
+                }
+            });
+        </script>
+    </body>
+</html>
