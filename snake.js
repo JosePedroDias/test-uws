@@ -3,8 +3,6 @@ const { pack, unpack } = require('msgpackr');
 
 const PORT = 9001;
 
-
-
 ///////////
 
 const W = 60;
@@ -14,6 +12,8 @@ const CHAR_EMPTY = ' ';
 const CHAR_SNAKE = 'O';
 const CHAR_FOOD = '*';
 const CHAR_OBSTACLE = '#';
+
+const TICK_RATE_MS = 1000 / 10; // 10 times/second
 
 const dirLookup = {
     left:  [-1,  0],
@@ -178,16 +178,16 @@ function onTick() {
     }
 }
 
-setInterval(onTick, 1000 / 10);
+setInterval(onTick, TICK_RATE_MS);
 
 ///////////
 
 const _App = uWS.App;
 //const _App = uWS.SSLApp;
 
-let maxI = 1;
+let maxId = 1;
 function getId(ws) {
-  return maxI++;
+  return maxId++;
 }
 
 const idToWsInstance = new Map(); // id -> ws
@@ -195,35 +195,27 @@ const idToWsInstance = new Map(); // id -> ws
 function broadcast(msg) {
     const msgO = pack(msg);
     const wss = Array.from(idToWsInstance.values());
-    for (const ws of wss) {
-        ws.send(msgO, true);
-    }
+    for (const ws of wss) ws.send(msgO, true);
 }
 
-const app = _App({
+_App({
   key_file_name: 'misc/key.pem',
   cert_file_name: 'misc/cert.pem',
   passphrase: '1234'
 }).ws('/*', {
-  //compression: 0,
   compression: uWS.SHARED_COMPRESSOR,
-  //maxPayloadLength: 16 * 1024 * 1024, // bytes?
   maxPayloadLength: 4 * 1024, // bytes?
   idleTimeout: 60, // secs?
 
   open: (ws) => {
-    console.log('A WebSocket connected!');
+    console.log('WebSocket connected!');
 
-    if (!ws.id) {
-      ws.id = getId(ws);
-      idToWsInstance.set(ws.id, ws);
-      console.log(`new client: ${ws.id}`);
-    }
+    ws.id = getId(ws);
+    idToWsInstance.set(ws.id, ws);
+    console.log(`  new client: ${ws.id}`);
 
     ws.send(pack({ op:'own-id', id:ws.id}), true);
-
     ws.send(pack({ op:'board-init', w:W, h:H }), true);
-
     ws.send(pack({ op:'board-diff', diff:board.diff(board0) }), true);
   },
   message: (ws, message, isBinary) => {
@@ -248,12 +240,8 @@ const app = _App({
   close: (ws, code, message) => {
     console.log(`WebSocket closed with ${code}`);
 
-    if (!ws.id) {
-      console.log('oops');
-    } else {
-      idToWsInstance.delete(ws.id);
-      console.log(`closed ${ws.id} ok`);
-    }
+    idToWsInstance.delete(ws.id);
+    console.log(`  closed ${ws.id} ok`);
   }
 }).any('/*', (res, req) => {
   res.end('Nothing to see here!');
