@@ -156,18 +156,36 @@ let board0 = new Board(W, H, CHAR_EMPTY); // REFERENCE FOR NEW CLIENTS
 let boardPrev = board0.clone();
 let board;
 let snake;
-reset();
 
-function reset() {
-    board = board0.clone();
-    snake = new Snake(board, () => {
+let snakes = new Map(); // id -> snake
+
+function addSnake(id) {
+    const snake = new Snake(board, () => {
         broadcast({ op:'game-over' });
         setTimeout(reset, 1000);
     });
+
+    snakes.set(id, snake);
+}
+
+function removeSnake(id) {
+    const snake = snakes.get(id);
+
+    for (const [x, y] of snake.ps) {
+        board.setCell(x, y, CHAR_EMPTY);
+    }
+
+    snakes.delete(id);
+}
+
+function reset() {
+    snakes = new Map();
+    board = board0.clone();
+    for (const id of idToWsInstance.keys()) addSnake(id);
 }
 
 function onTick() {
-    snake.move();
+    for (const snake of snakes.values()) snake.move();
 
     const diff = board.diff(boardPrev);
 
@@ -198,6 +216,8 @@ function broadcast(msg) {
     for (const ws of wss) ws.send(msgO, true);
 }
 
+reset();
+
 _App({
   key_file_name: 'misc/key.pem',
   cert_file_name: 'misc/cert.pem',
@@ -217,6 +237,8 @@ _App({
     ws.send(pack({ op:'own-id', id:ws.id}), true);
     ws.send(pack({ op:'board-init', w:W, h:H }), true);
     ws.send(pack({ op:'board-diff', diff:board.diff(board0) }), true);
+
+    addSnake(ws.id);
   },
   message: (ws, message, isBinary) => {
     if (!isBinary) {
@@ -228,7 +250,10 @@ _App({
 
     switch (data.op) {
       case 'key':
-        snake.dir = data.key;
+        {
+            const snake = snakes.get(ws.id);
+            snake.dir = data.key;
+        }
         break;
       default:
         console.log(`unsupported opcode: ${data.op}`);
@@ -239,7 +264,7 @@ _App({
   },
   close: (ws, code, message) => {
     console.log(`WebSocket closed with ${code}`);
-
+    removeSnake(ws.id);
     idToWsInstance.delete(ws.id);
     console.log(`  closed ${ws.id} ok`);
   }

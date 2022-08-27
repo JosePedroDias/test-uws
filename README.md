@@ -36,8 +36,8 @@ visit http://127.0.0.1:8090/basic.html -> ws://127.0.0.1:9001
 sends arrow keys. receives board diffs
 
 ```
-node snake &
 http-server . -c-1 -p 8090 --cors &
+node snake
 ```
 
 visit http://127.0.0.1:8090/snake.html -> ws://127.0.0.1:9001
