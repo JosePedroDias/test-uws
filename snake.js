@@ -15,6 +15,8 @@ const CHAR_SNAKE = 'O';
 const CHAR_FOOD = '*';
 const CHAR_OBSTACLE = '#';
 
+//const TOPIC_BROADCAST = 'broadcast';
+
 const dirLookup = {
     left:  [-1,  0],
     right: [ 1,  0],
@@ -157,18 +159,20 @@ class Snake {
 }
 
 const snake = new Snake(board, () => {
-    _ws && _ws.send(pack({ op:'game-over' }), true);
+    //const ws = getAnyWs();
+    //ws?.publish(TOPIC_BROADCAST, pack({ op:'game-over' }), true);
+    broadcast({ op:'game-over' });
 });
 
 function onTick() {
-    if (!_ws) return;
-
     snake.move();
 
     const diff = board.diff(boardPrev);
 
     if (diff.length > 0) {
-        _ws.send(pack({ op:'board-diff', diff:board.diff(boardPrev) }), true);
+        broadcast({ op:'board-diff', diff:board.diff(boardPrev) });
+        //ws.publish(TOPIC_BROADCAST, pack({ op:'board-diff', diff:board.diff(boardPrev) }), true);
+
         boardPrev = board.clone();
     }
 }
@@ -179,9 +183,6 @@ setInterval(onTick, 1000 / 10);
 
 ///////////
 
-
-let _ws;
-
 const _App = uWS.App;
 //const _App = uWS.SSLApp;
 
@@ -190,23 +191,20 @@ function getId(ws) {
   return maxI++;
 }
 
-/* const map2 = new Map(); // id -> ws
-const ids = new Set();
+const idToWsInstance = new Map(); // id -> ws
 
-function otherIds(ownId) {
-  const res = [];
-  for (const id of ids.keys()) {
-    if (id !== ownId) {
-      res.push(id);
-    }
-  }
-  return res;
+function getAnyWs() {
+    const wss = Array.from(idToWsInstance.values());
+    return wss && wss[0];
 }
 
-function sendToOthers(ownId, msg_) {
-  const msg = pack(msg_);
-  otherIds(ownId).map(id => map2.get(id)).forEach(ws => ws.send(msg, true));
-} */
+function broadcast(msg) {
+    const msgO = pack(msg);
+    const wss = Array.from(idToWsInstance.values());
+    for (const ws of wss) {
+        ws.send(msgO, true);
+    }
+}
 
 const app = _App({
   key_file_name: 'misc/key.pem',
@@ -224,8 +222,7 @@ const app = _App({
 
     if (!ws.id) {
       ws.id = getId(ws);
-      //map2.set(ws.id, ws);
-      //ids.add(ws.id);
+      idToWsInstance.set(ws.id, ws);
       console.log(`new client: ${ws.id}`);
     }
 
@@ -235,7 +232,7 @@ const app = _App({
 
     ws.send(pack({ op:'board-diff', diff:board.diff(board0) }), true);
 
-    _ws = ws;
+    //ws.subscribe(TOPIC_BROADCAST);
   },
   message: (ws, message, isBinary) => {
     if (!isBinary) {
@@ -262,12 +259,9 @@ const app = _App({
     if (!ws.id) {
       console.log('oops');
     } else {
-      //map2.delete(ws.id);
-      //ids.delete(ws.id);
+      idToWsInstance.delete(ws.id);
       console.log(`closed ${ws.id} ok`);
     }
-    //TODO TEMP
-    _ws = undefined;
   }
 }).any('/*', (res, req) => {
   res.end('Nothing to see here!');
